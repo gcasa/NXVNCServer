@@ -6,6 +6,8 @@ LIBS = -lNeXT_s
 
 OBJS = NXVNCFramebuffer.o NXVNCRFBServer.o main.o
 
+.PHONY: all clean documentation
+
 all: nxvncserver
 
 nxvncserver: $(OBJS)
@@ -15,4 +17,7 @@ nxvncserver: $(OBJS)
 	$(OBJC) $(OBJCFLAGS) -c $<
 
 clean:
-	rm -f $(OBJS) nxvncserver
+	rm -f $(OBJS) nxvncserver NXVNCFramebuffer.gsdoc NXVNCRFBServer.gsdoc
+
+documentation:
+	autogsdoc NXVNCFramebuffer.h NXVNCRFBServer.h

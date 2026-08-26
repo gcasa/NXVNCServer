@@ -48,3 +48,18 @@ The native implementation follows the documented NeXTSTEP 3.3 `NXSizeBitmap`
 and `NXReadBitmap` ABI. Use the declaration in the target machine's
 `appkit/graphics.h` as authoritative if an older SDK reports an argument
 mismatch.
+
+## Documentation
+
+The public interfaces use GNUstep's autogsdoc comment format.  With GNUstep
+Base development tools installed, generate the class reference with:
+
+    make documentation
+
+The generated `.gsdoc` files may be converted to HTML with the standard
+GNUstep documentation tools.
+
+## License
+
+NXVNCserver is free software distributed under the GNU General Public License,
+version 3 or (at your option) any later version.
