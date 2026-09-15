@@ -69,7 +69,7 @@ static unsigned long get32(unsigned char *p)
          port: (int)port
 {
   [super init];
-  _framebuffer = framebuffer;
+  _framebuffer = [framebuffer retain];
   _port = port; _listenSocket = _clientSocket = -1;
   _bitsPerPixel = 32; _bigEndian = 1;
   _redMax = _greenMax = _blueMax = 255;
@@ -214,10 +214,11 @@ static unsigned long get32(unsigned char *p)
   }
 }
 
-- free
+- (void) dealloc
 {
   if (_clientSocket >= 0) close(_clientSocket);
   if (_listenSocket >= 0) close(_listenSocket);
-  return [super free];
+  [_framebuffer release];
+  [super dealloc];
 }
 @end

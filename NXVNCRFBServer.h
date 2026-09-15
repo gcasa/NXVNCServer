@@ -19,14 +19,14 @@
 #ifndef _NXVNCRFBServer_h_GNUSTEP_BASE_INCLUDE
 #define _NXVNCRFBServer_h_GNUSTEP_BASE_INCLUDE
 
-#import <objc/Object.h>
+#import <Foundation/NSObject.h>
 @class NXVNCFramebuffer;
 
 /**
  * NXVNCRFBServer accepts one RFB 3.3 client at a time and supplies raw
  * framebuffer updates using an associated NXVNCFramebuffer.
  */
-@interface NXVNCRFBServer : Object
+@interface NXVNCRFBServer : NSObject
 {
   int _listenSocket;
   int _clientSocket;
@@ -42,8 +42,8 @@
          port: (int)port;
 /** Runs the blocking accept loop and returns zero after a fatal error. */
 - (int) run;
-/** Closes open sockets and releases the receiver. */
-- free;
+/** Closes open sockets and releases resources owned by the receiver. */
+- (void) dealloc;
 @end
 
 #endif /* _NXVNCRFBServer_h_GNUSTEP_BASE_INCLUDE */

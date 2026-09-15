@@ -19,7 +19,7 @@
 #ifndef _NXVNCFramebuffer_h_GNUSTEP_BASE_INCLUDE
 #define _NXVNCFramebuffer_h_GNUSTEP_BASE_INCLUDE
 
-#import <objc/Object.h>
+#import <Foundation/NSObject.h>
 
 typedef unsigned char NXVNCByte;
 
@@ -27,7 +27,7 @@ typedef unsigned char NXVNCByte;
  * NXVNCFramebuffer stores a display image in the canonical RFB pixel format.
  * Subclasses override <code>-refresh</code> to acquire a new display image.
  */
-@interface NXVNCFramebuffer : Object
+@interface NXVNCFramebuffer : NSObject
 {
   int _width;
   int _height;
@@ -44,8 +44,8 @@ typedef unsigned char NXVNCByte;
 - (NXVNCByte *) pixels;
 /** Refreshes the pixel storage and returns nonzero on success. */
 - (int) refresh;
-/** Releases the pixel storage and the receiver. */
-- free;
+/** Releases resources owned by the receiver. */
+- (void) dealloc;
 @end
 
 /**
@@ -59,7 +59,6 @@ typedef unsigned char NXVNCByte;
 - (int) refresh;
 @end
 
-#ifdef NEXTSTEP
 /**
  * NXVNCScreenFramebuffer reads the root display through Display PostScript.
  */
@@ -69,6 +68,5 @@ typedef unsigned char NXVNCByte;
 /** Reads and converts the current root-window image. */
 - (int) refresh;
 @end
-#endif
 
 #endif /* _NXVNCFramebuffer_h_GNUSTEP_BASE_INCLUDE */

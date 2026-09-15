@@ -17,16 +17,12 @@
  with NXVNCserver.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #import "NXVNCFramebuffer.h"
+#import <AppKit/NSApplication.h>
+#import <AppKit/NSBitmapImageRep.h>
+#import <AppKit/NSScreen.h>
+#import <DPSClient/NSDPSContext.h>
 #include <stdlib.h>
 #include <string.h>
-
-#ifdef NEXTSTEP
-#import <appkit/appkit.h>
-#import <appkit/graphics.h>
-
-/* Generated DPS operator wrapper supplied by the NeXT AppKit. */
-extern void PSsetwindow(int windowNumber);
-#endif
 
 @implementation NXVNCFramebuffer
 - initWidth: (int)width
@@ -36,7 +32,11 @@ extern void PSsetwindow(int windowNumber);
   _width = width;
   _height = height;
   _pixels = (NXVNCByte *)malloc((unsigned)(width * height * 4));
-  if (_pixels == 0) return [self free];
+  if (_pixels == 0)
+    {
+      [self release];
+      return nil;
+    }
   memset(_pixels, 0, (unsigned)(width * height * 4));
   return self;
 }
@@ -56,11 +56,11 @@ extern void PSsetwindow(int windowNumber);
 {
   return 1;
 }
-- free
+- (void) dealloc
 {
   if (_pixels != 0) free(_pixels);
   _pixels = 0;
-  return [super free];
+  [super dealloc];
 }
 @end
 
@@ -84,61 +84,63 @@ extern void PSsetwindow(int windowNumber);
 }
 @end
 
-#ifdef NEXTSTEP
 @implementation NXVNCScreenFramebuffer
 - init
 {
-  NXRect r;
-  int size, pw, ph, bps, spp, config, mask;
+  NSRect frame;
 
-  [Application new];
-  r.origin.x = r.origin.y = 0.0;
-  r.size = [NXApp screenSize];
-  PSsetwindow(0);
-  NXSizeBitmap(&r, &size, &pw, &ph, &bps, &spp, &config, &mask);
-  return [super initWidth:pw height:ph];
+  [NSApplication sharedApplication];
+  frame = [[NSScreen mainScreen] frame];
+  return [super initWidth: (int)frame.size.width
+                   height: (int)frame.size.height];
 }
 
 - (int) refresh
 {
-  NXRect r;
-  int size, pw, ph, bps, spp, config, mask;
+  NSBitmapImageRep *image;
+  NSDPSContext *context;
+  NSRect frame;
   unsigned char *planes[5];
-  int x, y, i, rowBytes;
+  int x, y, i, rowBytes, spp, planar;
 
-  r.origin.x = r.origin.y = 0.0;
-  r.size.width = (float)_width;
-  r.size.height = (float)_height;
-  PSsetwindow(0);
-  NXSizeBitmap(&r, &size, &pw, &ph, &bps, &spp, &config, &mask);
-  if (bps != 8 || spp < 1 || spp > 5 || size <= 0) return 0;
-  for (i = 0; i < 5; i++) planes[i] = 0;
-  /* config == 0 is meshed; otherwise the samples occupy spp planes. */
-  for (i = 0; i < (config ? spp : 1); i++) {
-    planes[i] = (unsigned char *)malloc((unsigned)size);
-    if (planes[i] == 0) {
-      while (--i >= 0) free(planes[i]);
+  context = [NSApp context];
+  [NSDPSContext setCurrentContext: context];
+  [context printFormat: @"0 setwindow\n"];
+  [context flush];
+  [context wait];
+
+  frame = NSMakeRect(0.0, 0.0, (float)_width, (float)_height);
+  image = [[NSBitmapImageRep alloc] initWithFocusedViewRect: frame];
+  if (image == nil || [image bitsPerSample] != 8)
+    {
+      [image release];
       return 0;
     }
-  }
-  NXReadBitmap(&r, pw, ph, bps, spp, config, mask,
-        planes[0], planes[1], planes[2], planes[3], planes[4]);
 
-  /* Convert packed gray/RGB into RFB's 00rrggbb.  Screen coordinates
-   are bottom-up; RFB scan lines are top-down. */
+  spp = [image samplesPerPixel];
+  planar = [image isPlanar];
+  rowBytes = [image bytesPerRow];
+  if (spp < 1 || spp > 5 || rowBytes <= 0)
+    {
+      [image release];
+      return 0;
+    }
+  for (i = 0; i < 5; i++) planes[i] = 0;
+  [image getBitmapDataPlanes: planes];
+
+  /* Convert planar or meshed gray/RGB into RFB's 00rrggbb. */
   for (y = 0; y < _height; y++) {
     unsigned char *src;
     unsigned char *dst = _pixels + y * _width * 4;
-    rowBytes = config ? size / ph : size / ph;
     src = planes[0] + (_height - 1 - y) * rowBytes;
     for (x = 0; x < _width; x++) {
       unsigned char red, green, blue;
       if (spp < 3) {
-        if (config) red = green = blue =
+        if (planar) red = green = blue =
           planes[0][(_height - 1 - y) * rowBytes + x];
         else red = green = blue = src[x * spp];
       }
-      else if (config) {
+      else if (planar) {
         red = planes[0][(_height - 1 - y) * rowBytes + x];
         green = planes[1][(_height - 1 - y) * rowBytes + x];
         blue = planes[2][(_height - 1 - y) * rowBytes + x];
@@ -151,8 +153,7 @@ extern void PSsetwindow(int windowNumber);
       *dst++ = 0; *dst++ = red; *dst++ = green; *dst++ = blue;
     }
   }
-  for (i = 0; i < (config ? spp : 1); i++) free(planes[i]);
+  [image release];
   return 1;
 }
 @end
-#endif
