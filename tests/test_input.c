@@ -1,4 +1,5 @@
 #include "NXVNCInput.h"
+#include "NXVNCPlatform.h"
 #include <assert.h>
 #include <stdio.h>
 static NXVNCInputEvent events[1024];
@@ -31,7 +32,11 @@ int main(void)
   assert(events[count-1].flags==(1U<<17));
   assert(NXVNCInputKey(&s,'A',1));
   assert(events[count-1].code=='A' && events[count-1].originalCode=='a');
+#ifdef NXVNC_INPUT_INTEL
+  assert(events[count-1].keyCode==0x1e && !events[count-1].repeat);
+#else
   assert(events[count-1].keyCode==0x39 && !events[count-1].repeat);
+#endif
   assert(NXVNCInputKey(&s,'A',1) && events[count-1].repeat);
   assert(NXVNCInputKey(&s,'A',0) && events[count-1].type==11);
   assert(NXVNCInputKey(&s,0xff09,1) && events[count-1].code==25);
@@ -60,6 +65,24 @@ int main(void)
   assert(!NXVNCInputPointer(&s,101,50,1) && s.buttons==0);
   assert(!NXVNCInputKey(&s,'x',1));
   fail=0; assert(NXVNCInputReset(&s));
+#ifdef NXVNC_INPUT_INTEL
+  {
+    static const unsigned long symbols[]={'!','Z',' ',0xff0d,0xff08,0xff09,
+      0xff1b,0xff51,0xff52,0xff53,0xff54,0xff63,0xffff,0xff50,0xff57,
+      0xff55,0xff56,0xff8d,0xffbe,0xffc7,0xffc8,0xffc9,
+      0xffe1,0xffe2,0xffe3,0xffe4,0xffe9,0xffeb,0xffe5};
+    static const unsigned short codes[]={0x02,0x2c,0x39,0x1c,0x0e,0x0f,
+      0x01,0x66,0x64,0x67,0x65,0x68,0x69,0x6c,0x6d,
+      0x6a,0x6b,0x62,0x3b,0x44,0x57,0x58,
+      0x2a,0x36,0x1d,0x60,0x61,0x38,0x3a};
+    unsigned i;
+    for(i=0;i<sizeof(codes)/sizeof(codes[0]);i++) {
+      assert(NXVNCInputKey(&s,symbols[i],1));
+      assert(events[count-1].keyCode==codes[i]);
+      assert(NXVNCInputReset(&s));
+    }
+  }
+#endif
   puts("PASS: input translation, modifiers, repeats, drag, clipping, disconnect release, failures");
   return 0;
 }

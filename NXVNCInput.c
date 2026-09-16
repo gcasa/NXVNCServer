@@ -1,6 +1,57 @@
 /* RFB keysyms and pointer state to NeXT events. GPL-3.0-or-later. */
 #include "NXVNCInput.h"
+#include "NXVNCPlatform.h"
 #include <string.h>
+
+#ifdef NXVNC_INPUT_INTEL
+/* OPENSTEP PC keyboard scan codes, including the driver's extended codes.
+   Character values still come from RFB, not the local keyboard layout. */
+static unsigned short intelKeyCode(unsigned long sym)
+{
+  static const char letters[]="abcdefghijklmnopqrstuvwxyz";
+  static const unsigned char codes[]={0x1e,0x30,0x2e,0x20,0x12,0x21,0x22,
+    0x23,0x17,0x24,0x25,0x26,0x32,0x31,0x18,0x19,0x10,0x13,0x1f,0x14,
+    0x16,0x2f,0x11,0x2d,0x15,0x2c};
+  static const char normal[]="0123456789-=[]\\;',./` ";
+  static const char shifted[]=")!@#$%^&*(_+{}|:\"<>?~ ";
+  static const unsigned char punct[]={0x0b,0x02,0x03,0x04,0x05,0x06,0x07,
+    0x08,0x09,0x0a,0x0c,0x0d,0x1a,0x1b,0x2b,0x27,0x28,0x33,0x34,0x35,0x29,0x39};
+  int i;
+  if(sym>='A' && sym<='Z') sym+='a'-'A';
+  for(i=0;letters[i];i++) if(sym==(unsigned char)letters[i]) return codes[i];
+  for(i=0;normal[i];i++)
+    if(sym==(unsigned char)normal[i] || sym==(unsigned char)shifted[i]) return punct[i];
+  switch(sym) {
+  case 0xff08: return 0x0e;
+  case 0xff09: case 0xfe20: return 0x0f;
+  case 0xff0d: return 0x1c;
+  case 0xff1b: return 0x01;
+  case 0xff51: case 0xff96: return 0x66;
+  case 0xff52: case 0xff97: return 0x64;
+  case 0xff53: case 0xff98: return 0x67;
+  case 0xff54: case 0xff99: return 0x65;
+  case 0xff63: return 0x68;
+  case 0xffff: return 0x69;
+  case 0xff50: return 0x6c;
+  case 0xff57: return 0x6d;
+  case 0xff55: return 0x6a;
+  case 0xff56: return 0x6b;
+  case 0xff8d: return 0x62;
+  case 0xffe1: return 0x2a;
+  case 0xffe2: return 0x36;
+  case 0xffe3: return 0x1d;
+  case 0xffe4: return 0x60;
+  case 0xffe9: case 0xffea: return 0x61; /* PC right Alt = Option */
+  case 0xffe7: case 0xffeb: case 0xffe8: case 0xffec: return 0x38;
+  case 0xffe5: return 0x3a;
+  default:
+    if(sym>=0xffbe && sym<=0xffc7) return (unsigned short)(0x3b+sym-0xffbe);
+    if(sym==0xffc8) return 0x57;
+    if(sym==0xffc9) return 0x58;
+    return 0;
+  }
+}
+#endif
 
 static unsigned flags(unsigned mods)
 {
@@ -39,6 +90,9 @@ static int modifier(unsigned long sym, unsigned *bit, unsigned short *key)
   case 0xffe5: *bit=256; *key=0; break;
   default: return 0;
   }
+#ifdef NXVNC_INPUT_INTEL
+  *key=intelKeyCode(sym);
+#endif
   return 1;
 }
 
@@ -118,6 +172,9 @@ int NXVNCInputKey(NXVNCInput *s,unsigned long sym,int down)
     if(!down && slot<0) return 1;
     if(slot>=0) e=s->keys[slot].event;
     else if(!translate(sym,&e)) return 1;
+#ifdef NXVNC_INPUT_INTEL
+    e.keyCode=intelKeyCode(sym);
+#endif
     e.type=down ? 10 : 11; e.repeat=down && slot>=0;
     e.flags=(e.flags&(1U<<21))|flags(s->modifiers);
     if(down && e.set==0 && (s->modifiers&12)) {

@@ -379,6 +379,23 @@ with tempfile.TemporaryDirectory(prefix='nxvnc-tests-') as temp:
                     str(ROOT/'NXVNCInput.c'),str(ROOT/'NXVNCInputNative.c'),
                     str(ROOT/'tests/test_input_native.c'),'-o',str(folder/'native-input')],check=True)
     subprocess.run([str(folder/'native-input')],check=True)
+    subprocess.run(['cc','-std=c89','-pedantic','-Wall','-Wextra','-Werror',
+                    '-DNXVNC_INPUT_INTEL_TEST','-I'+str(ROOT),
+                    str(ROOT/'NXVNCInput.c'),str(ROOT/'tests/test_input.c'),
+                    '-o',str(folder/'intel-translation')],check=True)
+    subprocess.run([str(folder/'intel-translation')],check=True)
+    subprocess.run(['cc','-std=c89','-pedantic','-Wall','-Wextra','-Werror',
+                    '-DNXVNC_INPUT_INTEL_TEST','-I'+str(ROOT),
+                    str(ROOT/'NXVNCInput.c'),str(ROOT/'NXVNCInputNative.c'),
+                    str(ROOT/'tests/test_input_intel.c'),'-o',str(folder/'intel-input')],check=True)
+    subprocess.run([str(folder/'intel-input')],check=True)
+    for arch in ('m68k','intel'):
+        subprocess.run(['clang','-Wall','-Wextra','-Werror','-DNXVNC_INPUT_DPS_TEST',
+                        *(['-DNXVNC_INPUT_INTEL_TEST'] if arch=='intel' else []),
+                        '-I'+str(ROOT),'-framework','Foundation',
+                        str(ROOT/'NXVNCInputDPS.m'),str(ROOT/'tests/test_input_dps.m'),
+                        '-o',str(folder/('dps-'+arch))],check=True)
+        subprocess.run([str(folder/('dps-'+arch))],check=True)
     subprocess.run(['clang','-O2','-Wall','-Wextra','-Werror','-Wno-missing-method-return-type',
                     '-Wno-unused-parameter','-I'+str(ROOT),'-framework','Foundation',
                     str(ROOT/'tests/framebuffer.m'),str(ROOT/'NXVNCRFBServer.m'),

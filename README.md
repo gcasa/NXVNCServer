@@ -16,20 +16,31 @@ C89 declarations, BSD sockets, and GCC 2.7-compatible syntax.
 * expansion of 1-, 2-, 4-, and 8-bit screen samples to VNC pixel channels
 * a moving test pattern on other systems
 
-On OPENSTEP/m68k, remote input opens `/dev/evs0` and posts events through
-`EVSIOLLPE` and `EVSIOPTRLLPE`, using the system's m68k event structures.
+Remote input selects the native interface at compile time:
+
+* OPENSTEP/m68k opens `/dev/evs0` and posts through `EVSIOLLPE` and
+  `EVSIOPTRLLPE`, retaining the m68k event structures and NeXT keyboard codes.
+* OPENSTEP/Intel uses `NXOpenEventStatus` and `NXEvSetParameterInt` with
+  `EVIOLLPE` and `EVIOPTRLLPE`. Mouse posting updates the system cursor as well
+  as delivering the event. Keyboard events use PC scan codes, including the
+  event driver's extended codes for arrows and navigation keys.
+
 ASCII typing, shifted text, Control characters, navigation keys, and left/right
 clicks and drags are connected. Held keys and buttons are released when the
-viewer disconnects. Native behavior still needs verification on genoa.
+viewer disconnects. Arrows use the Window Server posting helper to preserve the
+numeric-pad flag, with native byte ordering for each architecture.
+Intel support has host-side tests but has not yet been built or exercised on
+an OPENSTEP/Intel installation. Native behavior still needs verification on genoa.
 
-The driver interface has no event-flags argument. Command/Option key chords
+Neither low-level driver interface has an event-flags argument. Command/Option key chords
 are therefore ignored with a log message; modified mouse clicks are ordinary
 clicks. Middle-button, wheel, and non-ASCII input are not supported. This backend
 does not change hardware modifier state. The test fixture records input without
 injecting it into the host desktop.
 
 Use `--view-only` to disable input. `--test` also disables native input. If opening
-the event device fails, the server logs the error and continues view-only.
+the event device or event-status handle fails, the server logs the error and
+continues view-only. Posting failures are logged separately.
 
 ## Building on OPENSTEP 4.2
 
@@ -37,6 +48,10 @@ Install the Developer tools, then run:
 
     make
     ./nxvncserver 5900
+
+Run `make clean` before rebuilding for another architecture or after copying
+a source tree containing object files from another machine. Architecture
+selection follows the compiler target; no input-backend option is necessary.
 
 To diagnose a viewer disconnect, capture the server's diagnostics:
 
@@ -180,6 +195,13 @@ capture improves:
 Host-side tests establish pixel/protocol correctness at the mocked AppKit
 boundary, not native DPS rendering or a measured 68040 speedup.
 
+The Intel input implementation follows the NeXT Mach event-driver interface
+retained in the archived [event-status implementation](https://github.com/neozeed/Darwin_0.1/blob/master/Libc/drivers.subproj/evs_api.c),
+[posting parameter definitions](https://github.com/neozeed/Darwin_0.1/blob/master/kernel/bsd/dev/evio.h),
+and [PC keyboard map](https://github.com/neozeed/Darwin_0.1/blob/master/kernel/bsd/dev/i386/PCKeymap.c).
+These are successor-system sources, not proof of an OPENSTEP 4.2 runtime test.
+Production builds use the installed SDK's event structures and constants.
+
 ## Tests
 
 On a modern Mac with Command Line Tools and Python 3:
@@ -199,6 +221,13 @@ invalidation, callback safety, wait counts, and exception cleanup. Build product
 are kept in a temporary directory. Native DPS capture still requires an OPENSTEP
 run.
 
+Input tests cover both m68k ioctl and Intel Mach parameter adapters, native key
+codes and payloads, arrow routing and DPS word ordering, driver failures, and
+disconnect releases. These tests substitute driver and DPS calls; they do not
+inject events into the host desktop. On Intel hardware, validate typing,
+Shift/Control, arrows, clicks, double-clicks, dragging, and disconnecting while
+holding a key or button before treating the port as natively verified.
+
 ## Design
 
 `NXVNCFramebuffer` owns the canonical RFB pixel buffer. Its native subclass
@@ -215,8 +244,10 @@ owns all network and RFB framing. Keeping those responsibilities separate makes
 it possible to replace screen capture for a particular NeXT OS release without
 touching the protocol implementation.
 
-The implementation contains no NeXTSTEP `NX*` APIs, legacy `Object` or
-`Application` classes, or references to NeXTSTEP compatibility libraries.
+The UI and capture implementation uses OPENSTEP AppKit and Foundation, with no
+legacy `Object` or `Application` classes. Intel input also uses the system's
+C event-status APIs (`NXOpenEventStatus`, `NXEvSetParameterInt`, and
+`NXCloseEventStatus`). No NeXTSTEP compatibility libraries are explicitly linked.
 
 ## Documentation
 

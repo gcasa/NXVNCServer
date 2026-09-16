@@ -7,6 +7,14 @@
 static struct evsioLLEvent last;
 static unsigned long lastRequest;
 static int calls,closed,failOpen,interruptOnce,failPost;
+static int arrows;
+int NXVNCInputPostArrow(const NXVNCInputEvent *event,int *target)
+{
+  assert(event->keyCode==9);
+  if(event->type==10) { assert(!*target); *target=123; }
+  else { assert(*target==123); *target=0; }
+  arrows++; return 1;
+}
 int mockInputOpen(const char *path,int flags,...)
 {
   (void)flags; assert(!strcmp(path,"/dev/evs0"));
@@ -36,6 +44,8 @@ int main(void)
   assert(last.data.key.keyCode==0x39 && !last.data.key.repeat);
   assert(NXVNCInputKey(&s,'A',1) && last.data.key.repeat);
   assert(NXVNCInputKey(&s,'A',0) && last.type==11);
+  assert(NXVNCInputKey(&s,0xff51,1) && arrows==1);
+  assert(NXVNCInputKey(&s,0xff51,0) && arrows==2);
   n=calls;
   assert(NXVNCInputKey(&s,0xffeb,1));
   assert(NXVNCInputKey(&s,'q',1) && calls==n);

@@ -4,7 +4,7 @@ CFLAGS = -O2 -Wall -Wno-import -traditional-cpp
 OBJCFLAGS = $(CFLAGS) -ObjC
 FRAMEWORKS = -framework AppKit -framework Foundation
 
-OBJS = NXVNCEncoding.o NXVNCInput.o NXVNCInputNative.o NXVNCFramebuffer.o NXVNCRFBServer.o main.o
+OBJS = NXVNCEncoding.o NXVNCInput.o NXVNCInputNative.o NXVNCInputDPS.o NXVNCFramebuffer.o NXVNCRFBServer.o main.o
 
 .PHONY: all clean documentation
 
@@ -13,13 +13,14 @@ all: nxvncserver
 NXVNCEncoding.o: NXVNCEncoding.c NXVNCEncoding.h
 	$(CC) $(CFLAGS) -c NXVNCEncoding.c
 
-NXVNCInput.o: NXVNCInput.c NXVNCInput.h
+NXVNCInput.o: NXVNCInput.c NXVNCInput.h NXVNCPlatform.h
 	$(CC) $(CFLAGS) -c NXVNCInput.c
 
-NXVNCInputNative.o: NXVNCInputNative.c NXVNCInput.h
+NXVNCInputNative.o: NXVNCInputNative.c NXVNCInput.h NXVNCPlatform.h
 	$(CC) $(CFLAGS) -c NXVNCInputNative.c
 
 NXVNCFramebuffer.o: NXVNCFramebuffer.h NXVNCEncoding.h
+NXVNCInputDPS.o: NXVNCInput.h NXVNCPlatform.h
 NXVNCRFBServer.o main.o: NXVNCFramebuffer.h NXVNCRFBServer.h NXVNCEncoding.h NXVNCInput.h
 
 nxvncserver: $(OBJS)
