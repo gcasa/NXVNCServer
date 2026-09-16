@@ -20,10 +20,12 @@
 #define _NXVNCRFBServer_h_GNUSTEP_BASE_INCLUDE
 
 #import <Foundation/NSObject.h>
+#include "NXVNCEncoding.h"
+#include "NXVNCInput.h"
 @class NXVNCFramebuffer;
 
 /**
- * NXVNCRFBServer accepts one RFB 3.3 client at a time and supplies raw
+ * NXVNCRFBServer accepts one RFB 3.3 client at a time and supplies encoded
  * framebuffer updates using an associated NXVNCFramebuffer.
  */
 @interface NXVNCRFBServer : NSObject
@@ -36,12 +38,24 @@
   int _bigEndian;
   unsigned _redMax, _greenMax, _blueMax;
   int _redShift, _greenShift, _blueShift;
+  NXVNCPixelFormat _format;
+  unsigned char *_previous;
+  unsigned long *_seenVersions;
+  unsigned _versionCount;
+  unsigned char _output[32768];
+  unsigned _outputCount;
+  unsigned long _wireBytes, _updateNumber;
+  double _sendSeconds, _lastRefresh, _refreshInterval;
+  int _encoding, _profile;
+  NXVNCInput *_input;
 }
 /** Initializes the server to publish framebuffer on the specified TCP port. */
 - initWithFramebuffer: (NXVNCFramebuffer *)framebuffer
          port: (int)port;
 /** Runs the blocking accept loop and returns zero after a fatal error. */
 - (int) run;
+/** The caller owns input and keeps it alive until the server is released. */
+- (void) setInput: (NXVNCInput *)input;
 /** Closes open sockets and releases resources owned by the receiver. */
 - (void) dealloc;
 @end

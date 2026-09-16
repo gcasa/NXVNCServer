@@ -26,27 +26,42 @@
 int main(int argc, char **argv)
 {
   int port = 5900;
+  int testPattern = 0, portSeen = 0, viewOnly = 0, i;
+  NXVNCInput input;
   NSAutoreleasePool *pool;
   NXVNCFramebuffer *fb;
   NXVNCRFBServer *server;
 
   pool = [NSAutoreleasePool new];
-  if (argc > 1) port = atoi(argv[1]);
+  for (i = 1; i < argc; i++) {
+    if (strcmp(argv[i], "--test") == 0) testPattern = 1;
+    else if (strcmp(argv[i], "--view-only") == 0) viewOnly = 1;
+    else if (!portSeen) { port = atoi(argv[i]); portSeen = 1; }
+    else { port = 0; break; }
+  }
   if (port < 1 || port > 65535) {
-    fprintf(stderr, "usage: %s [port]\n", argv[0]);
+    fprintf(stderr, "usage: %s [port] [--test] [--view-only]\n", argv[0]);
     return 2;
   }
-  fb = [NXVNCScreenFramebuffer new];
+  if (testPattern) {
+    fb = [[NXVNCTestFramebuffer alloc] initWidth:640 height:480];
+    fprintf(stderr, "NXVNC: test pattern enabled (640x480)\n");
+  } else fb = [NXVNCScreenFramebuffer new];
   if (fb == nil) { fprintf(stderr, "NXVNC: cannot create framebuffer\n"); return 1; }
   server = [[NXVNCRFBServer alloc] initWithFramebuffer:fb port:port];
+  NXVNCInputInit(&input,[fb width],[fb height],0,0);
+  if (server && !testPattern && !viewOnly &&
+      NXVNCInputOpen(&input,[fb width],[fb height])) [server setInput:&input];
   [fb release];
   if (![server run])
     {
       [server release];
+      NXVNCInputClose(&input);
       [pool release];
       return 1;
     }
   [server release];
+  NXVNCInputClose(&input);
   [pool release];
   return 0;
 }

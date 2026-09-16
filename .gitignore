@@ -1,0 +1,4 @@
+*~
+*.o
+nxvncserver
+*.log

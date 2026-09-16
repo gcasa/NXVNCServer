@@ -1,0 +1,1 @@
+NXVNC_PROFILE=1 NXVNC_CAPTURE_SYNC=1 NXVNC_FULL_CAPTURE=1 ./nxvncserver 5900 2>compatibility.log
