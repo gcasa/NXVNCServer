@@ -27,5 +27,7 @@ int NXVNCInputPointer(NXVNCInput *, int x, int y, unsigned buttons);
 int NXVNCInputReset(NXVNCInput *);
 int NXVNCInputOpen(NXVNCInput *, int width, int height);
 void NXVNCInputClose(NXVNCInput *);
+/* Native arrow delivery with per-event flags; target survives until key-up. */
+int NXVNCInputPostArrow(const NXVNCInputEvent *, int *target);
 
 #endif

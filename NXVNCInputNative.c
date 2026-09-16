@@ -16,14 +16,17 @@
 #include <bsd/dev/m68k/evsio.h>
 #endif
 
-typedef struct { int fd, warned; } NativeInput;
+typedef struct { int fd, warned; int arrowTargets[4]; } NativeInput;
 
 static int postNative(void *context,const NXVNCInputEvent *event)
 {
   NativeInput *native=(NativeInput *)context;
   struct evsioLLEvent e;
-  int result;
+  int result, arrow=-1;
   unsigned long request;
+  if((event->type==10 || event->type==11) && event->originalSet==1
+      && event->originalCode>=0xac && event->originalCode<=0xaf)
+    arrow=event->originalCode-0xac;
   /* EVSIOLLPE carries NXEventData, not the enclosing NXEvent.flags.
      Do not pretend a flags-changed event changes the hardware modifiers.
      Suppress Command/Option chords instead of unexpectedly typing letters. */
@@ -32,9 +35,14 @@ static int postNative(void *context,const NXVNCInputEvent *event)
       fprintf(stderr,"NXVNC: Command/Option input is not supported by the m68k event-posting interface\n");
       native->warned=1;
     }
-    if(event->type==10 || event->type==11) return 1;
+    /* Still release an arrow posted before the modifier was pressed. */
+    if(event->type==10 || (event->type==11 &&
+        (arrow<0 || !native->arrowTargets[arrow]))) return 1;
   }
   if(event->type==12) return 1;
+  /* Symbol arrows without NX_NUMERICPADMASK are printable glyphs in Terminal.
+     EVSIOLLPE has no flags field, so deliver these through the Window Server. */
+  if(arrow>=0) return NXVNCInputPostArrow(event,&native->arrowTargets[arrow]);
   memset(&e,0,sizeof(e)); e.type=event->type;
   /* The event driver uses screen coordinates from the top left, like RFB.
      Do not apply the AppKit bottom-left coordinate conversion here. */

@@ -73,10 +73,10 @@ static int translate(unsigned long sym, NXVNCInputEvent *e)
   case 0xff09: case 0xfe20: e->code=9; e->keyCode=0x41; break;
   case 0xff0d: e->code=13; e->keyCode=0x2a; break;
   case 0xff1b: e->code=27; e->keyCode=0x49; break;
-  case 0xff51: e->set=1; e->code=0xac; e->keyCode=9; break;
-  case 0xff52: e->set=1; e->code=0xad; e->keyCode=0x16; break;
-  case 0xff53: e->set=1; e->code=0xae; e->keyCode=0x10; break;
-  case 0xff54: e->set=1; e->code=0xaf; e->keyCode=0xf; break;
+  case 0xff51: case 0xff96: e->set=1; e->code=0xac; e->keyCode=9; e->flags=1U<<21; break;
+  case 0xff52: case 0xff97: e->set=1; e->code=0xad; e->keyCode=0x16; e->flags=1U<<21; break;
+  case 0xff53: case 0xff98: e->set=1; e->code=0xae; e->keyCode=0x10; e->flags=1U<<21; break;
+  case 0xff54: case 0xff99: e->set=1; e->code=0xaf; e->keyCode=0xf; e->flags=1U<<21; break;
   case 0xff63: e->set=254; e->code=0x2c; break;
   case 0xffff: e->set=254; e->code=0x2d; break;
   case 0xff50: e->set=254; e->code=0x2e; break;
@@ -124,6 +124,10 @@ int NXVNCInputKey(NXVNCInput *s,unsigned long sym,int down)
       if(e.code>=64 && e.code<=127) e.code&=31;
       else if(e.code==' ') e.code=0;
     }
+    /* NeXT shifted arrows use the double-arrow Symbol codes. Recompute from
+       the unmodified value so repeats do not apply the offset twice. */
+    if(down && e.originalSet==1 && e.originalCode>=0xac && e.originalCode<=0xaf)
+      e.code=(unsigned short)(e.originalCode+((s->modifiers&3) ? 0x30 : 0));
     if(down && e.code==9 && (s->modifiers&3)) e.code=25;
     if(!emit(s,&e)) return 0;
   }
