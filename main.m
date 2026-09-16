@@ -17,6 +17,7 @@
  with NXVNCserver.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #import "NXVNCFramebuffer.h"
+#import "NXVNCInterceptorFramebuffer.h"
 #import "NXVNCRFBServer.h"
 #include "NXVNCStartup.h"
 #import <Foundation/NSAutoreleasePool.h>
@@ -48,7 +49,7 @@ int main(int argc, char **argv)
   if (testPattern) {
     fb = [[NXVNCTestFramebuffer alloc] initWidth:640 height:480];
     fprintf(stderr, "NXVNC: test pattern enabled (640x480)\n");
-  } else fb = [NXVNCScreenFramebuffer new];
+  } else fb = NXVNCCreateScreenFramebuffer();
   if (fb == nil) {
     fprintf(stderr, "NXVNC: cannot create framebuffer\n");
     NXVNCInputClose(&input); [pool release]; return 1;

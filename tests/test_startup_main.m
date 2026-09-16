@@ -1,5 +1,6 @@
 /* Exercise real main.m with fake framebuffer/listener and credential calls. */
 #import "NXVNCFramebuffer.h"
+#import "NXVNCInterceptorFramebuffer.h"
 #import "NXVNCRFBServer.h"
 #include "startup_fixture.h"
 #include <assert.h>
@@ -19,6 +20,9 @@ int NXVNCMain(int,char **);
 @implementation NXVNCScreenFramebuffer
 - init { return [self initWidth:1120 height:832]; }
 @end
+NXVNCFramebuffer *NXVNCCreateScreenFramebuffer(void) {
+  return [NXVNCScreenFramebuffer new];
+}
 @implementation NXVNCRFBServer
 - initWithFramebuffer:(NXVNCFramebuffer *)fb port:(int)port {
   (void)fb; (void)port; assert(testEUID==testUID);
