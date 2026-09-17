@@ -1,4 +1,4 @@
-# NXVNCserver
+# NXVNCServer
 
 An intentionally small VNC/RFB display server for OPENSTEP 4.2 systems. The
 source uses Objective-C 1.0 messaging, OPENSTEP Foundation and AppKit classes,
