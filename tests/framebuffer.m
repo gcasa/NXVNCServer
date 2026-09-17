@@ -11,6 +11,9 @@ static int packed;
 static NXVNCInput input;
 static int recordInput(void *context,const NXVNCInputEvent *event) {
   (void)context;
+  if(getenv("NXVNC_TEST_INPUT_FAIL")) {
+    fprintf(stderr,"INPUT_FAILURE\n"); return 0;
+  }
   fprintf(stderr,"INPUT %d %d %d %u %u %u %d\n",event->type,event->x,event->y,
           event->flags,event->set,event->code,event->repeat);
   return 1;

@@ -14,7 +14,7 @@ int NXEvSetParameterInt(NXEventHandle h,char *name,unsigned int *params,unsigned
 {
   assert(h==&handle && count==6);
   assert(!strcmp(name,"Ev_LLPostEvent") || !strcmp(name,"Ev_PointerLLPostEvent"));
-  if(failPost) return 17;
+  if(failPost) return failPost;
   memcpy(last,params,sizeof(last)); memcpy(&data,params+3,sizeof(data));
   pointer=!strcmp(name,"Ev_PointerLLPostEvent"); calls++; return 0;
 }
@@ -52,7 +52,8 @@ int main(void)
   assert(NXVNCInputKey(&s,'q',0) && calls==n);
   assert(NXVNCInputKey(&s,0xff51,0) && arrowCalls==2 && !arrowTarget);
   assert(NXVNCInputKey(&s,0xffeb,0));
-  failPost=1; assert(!NXVNCInputKey(&s,'x',1)); failPost=0;
+  failPost=17; assert(!NXVNCInputKey(&s,'x',1));
+  failPost=-705; assert(!NXVNCInputPointer(&s,30,40,0)); failPost=0;
   assert(NXVNCInputKey(&s,'z',1));
   NXVNCInputClose(&s);
   assert(closed==1 && last[0]==4 && !s.post && !s.context);

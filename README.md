@@ -27,7 +27,7 @@ Remote input selects the native interface at compile time:
 
 ASCII typing, shifted text, Control characters, navigation keys, and left/right
 clicks and drags are connected. Held keys and buttons are released when the
-viewer disconnects. Arrows use the Window Server posting helper to preserve the
+viewer disconnects. Arrows use the Window Server posting routine to preserve the
 numeric-pad flag, with native byte ordering for each architecture.
 Intel support has host-side tests but has not yet been built or exercised on
 an OPENSTEP/Intel installation. Native behavior still needs verification on genoa.
@@ -37,6 +37,45 @@ are therefore ignored with a log message; modified mouse clicks are ordinary
 clicks. Middle-button, wheel, and non-ASCII input are not supported. This backend
 does not change hardware modifier state. The test fixture records input without
 injecting it into the host desktop.
+
+On Intel, event posting requires a privileged event-status handle. The server
+can be installed setuid root: on launch it opens that handle, permanently drops
+to the invoking user's UID/GID, and then creates Foundation/AppKit objects and
+opens the network listener. No separate input process or executable is used.
+The normal user's supplementary groups are preserved; the executable is not
+setgid. A failed credential drop aborts startup, including in `--view-only` or
+`--test` mode. Launches with real UID zero are refused: run the installed binary
+from your normal account rather than using `su` or `sudo` to launch it.
+
+Build normally:
+
+    gnumake
+
+An administrator installs the server once, choosing an existing group containing
+only users authorized to control this desktop (replace `vncusers` below):
+
+    gnumake install-setuid INPUT_GROUP=vncusers
+
+Run the installation command as root. Ensure `/usr/local/bin` and its parents
+are owned by root and not writable by those users. The installed server is owned
+by root and the selected group, with mode `4750`. After installation, launch the
+installed copy from your normal user account:
+
+    /usr/local/bin/nxvncserver 5900
+
+Reinstall after rebuilding. The build-tree `./nxvncserver` is not setuid and
+starts view-only on Intel. `--view-only` and `--test` skip acquiring the input
+handle but still drop elevated credentials. If posting fails, the server attempts
+to release held input and continues view-only until restarted. Error `-705`
+(`IO_R_PRIVILEGE`) means the driver denied posting access.
+
+If you installed the previous `nxvnc-input-helper`, it is no longer used; an
+administrator can remove `/usr/local/libexec/nxvnc-input-helper`.
+
+Keeping the acquired Mach port after dropping UNIX privileges still needs
+verification on the target OPENSTEP/Intel installation. Host tests verify
+acquisition/drop ordering, failure handling, and view-only startup with mocked
+credentials and driver calls.
 
 Use `--view-only` to disable input. `--test` also disables native input. If opening
 the event device or event-status handle fails, the server logs the error and
@@ -200,13 +239,16 @@ retained in the archived [event-status implementation](https://github.com/neozee
 [posting parameter definitions](https://github.com/neozeed/Darwin_0.1/blob/master/kernel/bsd/dev/evio.h),
 and [PC keyboard map](https://github.com/neozeed/Darwin_0.1/blob/master/kernel/bsd/dev/i386/PCKeymap.c).
 These are successor-system sources, not proof of an OPENSTEP 4.2 runtime test.
-Production builds use the installed SDK's event structures and constants.
+Production builds use the installed SDK's event structures. The Intel Mach
+posting parameter names and word offsets are defined locally because OPENSTEP
+SDKs omit the private Intel `evio.h`; the payload size is checked before use.
 
 ## Tests
 
 On a modern Mac with Command Line Tools and Python 3:
 
     python3 tests/test_rfb.py
+    python3 tests/test_startup.py
 
 This compiles the C helpers with C89 warnings as errors, decodes their output
 independently, and exercises the real Objective-C server over TCP using a

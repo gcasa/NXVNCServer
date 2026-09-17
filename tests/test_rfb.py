@@ -355,6 +355,39 @@ def responsiveness_tests(binary,folder):
                 proc.terminate(); proc.wait(timeout=5)
     print('PASS: fragmented input during rate-limit wait and blocked socket writes, stalled-reader disconnect/reconnect')
 
+def input_failure_tests(binary,folder):
+    # Exercise both ordinary message dispatch and input drained during an update.
+    for during_update in (False,True):
+        listener=socket.socket(); listener.bind(('127.0.0.1',0))
+        port=listener.getsockname()[1]; listener.close()
+        log=folder/'input-failure.log'
+        with log.open('w') as output:
+            proc=subprocess.Popen([str(binary),str(port)],stdout=output,stderr=output,
+                env={**os.environ,'NXVNC_TEST_INPUT_FAIL':'1','NXVNC_MAX_FPS':'1'})
+            try:
+                for _ in range(100):
+                    try: c=Client(port); break
+                    except ConnectionRefusedError: time.sleep(.02)
+                else: raise AssertionError('server did not start')
+                c.update()
+                if during_update:
+                    c.s.sendall(struct.pack('!BBHHHH',3,1,0,0,c.width,c.height))
+                    time.sleep(.05)
+                c.s.sendall(struct.pack('!BBHH',5,0,12,7))
+                if during_update: c.response()
+                c.update()
+                # Input is disabled, but frames and reconnects still work.
+                c.s.sendall(struct.pack('!BBHI',4,1,0,ord('a')))
+                c.update(); c.close()
+                c=Client(port); c.update(); c.close()
+                assert proc.poll() is None
+                text=log.read_text()
+                assert text.count('INPUT_FAILURE')==1,text
+                assert text.count('continuing in view-only mode')==1,text
+            finally:
+                proc.terminate(); proc.wait(timeout=5)
+    print('PASS: failed input preserves display updates and reconnects in both dispatch paths')
+
 with tempfile.TemporaryDirectory(prefix='nxvnc-tests-') as temp:
     folder=Path(temp); library=folder/'encoding.dylib';binary=folder/'server'
     subprocess.run(['cc','-std=c89','-pedantic','-Wall','-Wextra','-Werror','-dynamiclib',
@@ -403,3 +436,4 @@ with tempfile.TemporaryDirectory(prefix='nxvnc-tests-') as temp:
     protocol_tests(binary,folder)
     protocol_tests(binary,folder,packed=True)
     responsiveness_tests(binary,folder)
+    input_failure_tests(binary,folder)

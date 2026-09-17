@@ -18,6 +18,7 @@
 
 #import "NXVNCFramebuffer.h"
 #import "NXVNCRFBServer.h"
+#include "NXVNCStartup.h"
 #import <Foundation/NSAutoreleasePool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -32,7 +33,6 @@ int main(int argc, char **argv)
   NXVNCFramebuffer *fb;
   NXVNCRFBServer *server;
 
-  pool = [NSAutoreleasePool new];
   for (i = 1; i < argc; i++) {
     if (strcmp(argv[i], "--test") == 0) testPattern = 1;
     else if (strcmp(argv[i], "--view-only") == 0) viewOnly = 1;
@@ -43,15 +43,23 @@ int main(int argc, char **argv)
     fprintf(stderr, "usage: %s [port] [--test] [--view-only]\n", argv[0]);
     return 2;
   }
+  if (!NXVNCPrepareInput(&input,!testPattern && !viewOnly)) return 1;
+  pool = [NSAutoreleasePool new];
   if (testPattern) {
     fb = [[NXVNCTestFramebuffer alloc] initWidth:640 height:480];
     fprintf(stderr, "NXVNC: test pattern enabled (640x480)\n");
   } else fb = [NXVNCScreenFramebuffer new];
-  if (fb == nil) { fprintf(stderr, "NXVNC: cannot create framebuffer\n"); return 1; }
+  if (fb == nil) {
+    fprintf(stderr, "NXVNC: cannot create framebuffer\n");
+    NXVNCInputClose(&input); [pool release]; return 1;
+  }
+  if ([fb width]<1 || [fb height]<1 || [fb width]>32768 || [fb height]>32768) {
+    fprintf(stderr,"NXVNC: unsupported framebuffer dimensions\n");
+    NXVNCInputClose(&input); [fb release]; [pool release]; return 1;
+  }
+  input.width=[fb width]; input.height=[fb height];
   server = [[NXVNCRFBServer alloc] initWithFramebuffer:fb port:port];
-  NXVNCInputInit(&input,[fb width],[fb height],0,0);
-  if (server && !testPattern && !viewOnly &&
-      NXVNCInputOpen(&input,[fb width],[fb height])) [server setInput:&input];
+  if (server && input.post) [server setInput:&input];
   [fb release];
   if (![server run])
     {

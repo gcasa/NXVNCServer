@@ -84,6 +84,7 @@ static unsigned long get32(unsigned char *p)
    messages stay ordered and are handled by serveClient after this update. */
 @interface NXVNCRFBServer (InputService)
 - (int) serviceInput;
+- (void) disableFailedInput;
 @end
 static int serviceServerInput(void *context)
 { return [(NXVNCRFBServer *)context serviceInput]; }
@@ -157,6 +158,15 @@ static int serviceServerInput(void *context)
      writeAll(_clientSocket, name, sizeof(name) - 1);
 }
 
+/* Input-driver failures must not tear down the framebuffer connection.
+   Release any held keys/buttons once, then stay view-only until restart. */
+- (void) disableFailedInput
+{
+  fprintf(stderr,"NXVNC: remote input failed; continuing in view-only mode\n");
+  NXVNCInputReset(_input);
+  _input=0;
+}
+
 - (int) serviceInput
 {
   unsigned char b[8];
@@ -177,8 +187,8 @@ static int serviceServerInput(void *context)
     if (ioctl(_clientSocket,FIONREAD,&available)<0) return 0;
     if (available<length) return 1;
     if (!readAll(_clientSocket,b,length)) return 0;
-    if (_input && b[0]==4 && !NXVNCInputKey(_input,get32(b+4),b[1]!=0)) return 0;
-    if (_input && b[0]==5 && !NXVNCInputPointer(_input,get16(b+2),get16(b+4),b[1])) return 0;
+    if (_input && b[0]==4 && !NXVNCInputKey(_input,get32(b+4),b[1]!=0)) [self disableFailedInput];
+    if (_input && b[0]==5 && !NXVNCInputPointer(_input,get16(b+2),get16(b+4),b[1])) [self disableFailedInput];
   }
   return 1;
 }
@@ -436,10 +446,10 @@ failed:
                width:get16(b + 5) height:get16(b + 7) incremental:b[0]]) return 0;
     } else if (type == 4) { /* KeyEvent */
       if (!readAll(_clientSocket, b, 7)) return 0;
-      if (_input && !NXVNCInputKey(_input,get32(b+3),b[0]!=0)) return 0;
+      if (_input && !NXVNCInputKey(_input,get32(b+3),b[0]!=0)) [self disableFailedInput];
     } else if (type == 5) { /* PointerEvent */
       if (!readAll(_clientSocket, b, 5)) return 0;
-      if (_input && !NXVNCInputPointer(_input,get16(b+1),get16(b+3),b[0])) return 0;
+      if (_input && !NXVNCInputPointer(_input,get16(b+1),get16(b+3),b[0])) [self disableFailedInput];
     } else if (type == 6) { /* ClientCutText */
       if (!readAll(_clientSocket, b, 7)) return 0;
       bytes = get32(b + 3);

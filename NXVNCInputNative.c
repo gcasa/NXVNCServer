@@ -90,17 +90,17 @@ void NXVNCInputClose(NXVNCInput *input)
 #include "tests/input_intel_stub.h"
 #else
 #include <drivers/event_status_driver.h>
-/* evio.h exposes the low-level posting parameter names only to driver clients. */
-#ifndef DRIVER_PRIVATE
-#define DRIVER_PRIVATE
-#define NXVNC_UNDEF_DRIVER_PRIVATE
 #endif
-#include <bsd/dev/evio.h>
-#ifdef NXVNC_UNDEF_DRIVER_PRIVATE
-#undef DRIVER_PRIVATE
-#undef NXVNC_UNDEF_DRIVER_PRIVATE
-#endif
-#endif
+
+/* OPENSTEP SDKs omit the Intel private evio.h. These Mach parameter
+   names and word offsets follow the NeXT event-driver protocol retained in
+   Darwin_0.1/kernel/bsd/dev/evio.h. Keep the SDK's NXEventData definition
+   and validate its size in NXVNCInputOpen before posting anything. */
+#define NXVNC_INTEL_LLPE "Ev_LLPostEvent"
+#define NXVNC_INTEL_PTRLLPE "Ev_PointerLLPostEvent"
+enum { NXVNC_INTEL_TYPE, NXVNC_INTEL_LOC_X, NXVNC_INTEL_LOC_Y,
+       NXVNC_INTEL_DATA0, NXVNC_INTEL_DATA1, NXVNC_INTEL_DATA2,
+       NXVNC_INTEL_SIZE };
 
 typedef struct { NXEventHandle handle; int warned, arrowTargets[4]; } IntelInput;
 
@@ -108,8 +108,8 @@ static int postIntel(void *context,const NXVNCInputEvent *event)
 {
   IntelInput *native=(IntelInput *)context;
   NXEventData data;
-  unsigned int params[EVIOLLPE_SIZE];
-  char *request=EVIOLLPE;
+  unsigned int params[NXVNC_INTEL_SIZE];
+  char *request=NXVNC_INTEL_LLPE;
   int result, arrow=-1;
   if((event->type==10 || event->type==11) && event->originalSet==1
       && event->originalCode>=0xac && event->originalCode<=0xaf)
@@ -126,10 +126,10 @@ static int postIntel(void *context,const NXVNCInputEvent *event)
   if(event->type==12) return 1;
   if(arrow>=0) return NXVNCInputPostArrow(event,&native->arrowTargets[arrow]);
   memset(&data,0,sizeof(data)); memset(params,0,sizeof(params));
-  params[EVIOLLPE_TYPE]=event->type;
-  params[EVIOLLPE_LOC_X]=event->x; params[EVIOLLPE_LOC_Y]=event->y;
+  params[NXVNC_INTEL_TYPE]=event->type;
+  params[NXVNC_INTEL_LOC_X]=event->x; params[NXVNC_INTEL_LOC_Y]=event->y;
   if(event->type>=1 && event->type<=7) {
-    request=EVIOPTRLLPE;
+    request=NXVNC_INTEL_PTRLLPE;
     data.mouse.pressure=(event->type==1 || event->type==3 ||
                         event->type==6 || event->type==7) ? 255 : 0;
   } else {
@@ -139,9 +139,13 @@ static int postIntel(void *context,const NXVNCInputEvent *event)
     data.key.keyCode=event->keyCode; data.key.repeat=(short)event->repeat;
   }
   /* Use the SDK's native layout; this is a Mach integer array, not RFB data. */
-  memcpy(&params[EVIOLLPE_DATA0],&data,sizeof(data));
-  result=NXEvSetParameterInt(native->handle,request,params,EVIOLLPE_SIZE);
-  if(result!=0) fprintf(stderr,"NXVNC: Intel event injection failed (%d)\n",result);
+  memcpy(&params[NXVNC_INTEL_DATA0],&data,sizeof(data));
+  result=NXEvSetParameterInt(native->handle,request,params,NXVNC_INTEL_SIZE);
+  /* NeXT DriverKit IO_R_PRIVILEGE; opening an unprivileged event-status
+     handle can succeed even though it cannot post events. */
+  if(result==-705)
+    fprintf(stderr,"NXVNC: Intel event injection denied (-705): a privileged event handle is required; check the setuid installation or use --view-only\n");
+  else if(result!=0) fprintf(stderr,"NXVNC: Intel event injection failed (%d)\n",result);
   return result==0;
 }
 
@@ -152,7 +156,7 @@ int NXVNCInputOpen(NXVNCInput *input,int width,int height)
   NXVNCInputInit(input,width,height,0,0);
   if(width<1 || height<1 || width>32768 || height>32768) return 0;
   /* The native event payload must fit the documented three data words. */
-  if(sizeof(NXEventData) != (EVIOLLPE_SIZE-EVIOLLPE_DATA0)*sizeof(unsigned int)) {
+  if(sizeof(NXEventData) != (NXVNC_INTEL_SIZE-NXVNC_INTEL_DATA0)*sizeof(unsigned int)) {
     fprintf(stderr,"NXVNC: unsupported Intel event-data layout; view-only\n");
     return 0;
   }

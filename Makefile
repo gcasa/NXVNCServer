@@ -4,7 +4,7 @@ CFLAGS = -O2 -Wall -Wno-import -traditional-cpp
 OBJCFLAGS = $(CFLAGS) -ObjC
 FRAMEWORKS = -framework AppKit -framework Foundation
 
-OBJS = NXVNCEncoding.o NXVNCInput.o NXVNCInputNative.o NXVNCInputDPS.o NXVNCFramebuffer.o NXVNCRFBServer.o main.o
+OBJS = NXVNCEncoding.o NXVNCInput.o NXVNCInputNative.o NXVNCStartup.o NXVNCInputDPS.o NXVNCFramebuffer.o NXVNCRFBServer.o main.o
 
 .PHONY: all clean documentation
 
@@ -34,3 +34,17 @@ clean:
 
 documentation:
 	autogsdoc NXVNCFramebuffer.h NXVNCRFBServer.h
+
+NXVNCStartup.o: NXVNCStartup.c NXVNCStartup.h NXVNCInput.h NXVNCPlatform.h
+	$(CC) $(CFLAGS) -c NXVNCStartup.c
+
+main.o: NXVNCStartup.h
+
+# Explicit, one-time administrator installation; no separate input executable.
+BINDIR = /usr/local/bin
+INPUT_GROUP =
+.PHONY: install-setuid
+install-setuid: nxvncserver
+	@test -n "$(INPUT_GROUP)" || (echo "Specify INPUT_GROUP: only this group may control the desktop"; exit 1)
+	install -d -m 755 $(BINDIR)
+	install -o root -g "$(INPUT_GROUP)" -m 4750 nxvncserver $(BINDIR)/nxvncserver
