@@ -4,6 +4,9 @@
 #define NSBackingStoreNonretained 0
 #define NSDeviceBlackColorSpace @"Black"
 #define NSCalibratedBlackColorSpace @"CalibratedBlack"
+#define NSDeviceWhiteColorSpace @"White"
+#define NSCalibratedWhiteColorSpace @"CalibratedWhite"
+#define NSDeviceRGBColorSpace @"RGB"
 @interface NSDPSContext : NSObject
 + (void)setCurrentContext:(id)context;
 - (void)printFormat:(NSString *)format, ...;
@@ -18,6 +21,7 @@ extern NSApplication *NSApp;
 @interface NSScreen : NSObject
 + (id)mainScreen;
 - (NSRect)frame;
+- (NSDictionary *)deviceDescription;
 @end
 @interface NSView : NSObject
 - (void)lockFocus;

@@ -12,7 +12,7 @@ C89 declarations, BSD sockets, and GCC 2.7-compatible syntax.
 * raw, TRLE palette, and Hextile framebuffer encodings
 * requested-area capture and updates, with tight changed rectangles for incremental updates
 * one client at a time, reconnectable
-* native screen acquisition through `NSDPSContext` and `NSBitmapImageRep`
+* Interceptor screen capture on i386, with Display PostScript fallback
 * expansion of 1-, 2-, 4-, and 8-bit screen samples to VNC pixel channels
 * a moving test pattern on other systems
 
@@ -109,6 +109,12 @@ This uses the same RFB handshake and pixel encoding without screen capture.
 The Makefile links the `AppKit` and `Foundation` frameworks directly. It does
 not require the NeXTSTEP compatibility libraries `libNeXT_s` or `libsys_s`.
 
+Interceptor is optional and loaded at runtime. Capture defaults to Interceptor
+on i386, with DPS fallback if unavailable or unsupported, and DPS elsewhere.
+Set `NXVNC_CAPTURE` to `auto` (default), `dps`, or `interceptor` to override.
+Interceptor on m68k is unverified. Mapped capture can tear during screen
+changes; restart the server after changing display resolution.
+
 Connect a VNC viewer to `next-host:5900`. Because there is no authentication,
 bind or firewall this port to a trusted network only; an SSH tunnel is the
 preferred exposure method.
@@ -174,19 +180,19 @@ tile versions. The first capture and changes in grayscale polarity also
 invalidate all packed tiles. Generic framebuffer providers can fall back to a
 full refresh through `refreshX:y:width:height:`.
 
-Capture configures `setautofill` once per capture window, removes the redundant
+DPS capture configures `setautofill` once per capture window, removes the redundant
 initial `orderOut`, and batches setup with ordering before one synchronization.
 It still waits after ordering the window in and after hiding it. This reduces
 explicit DPS waits from four to two per refresh. The accompanying Grabber source
 uses ordered DPS commands without a wait between every operation; native
 OPENSTEP validation is still required for this optimized sequence and cropping.
-No unverified device mapping or direct framebuffer access is used.
+The DPS backend does not use direct framebuffer access.
 
 Log every update's timings with:
 
     NXVNC_PROFILE=1 ./nxvncserver 5900 2>performance.log
 
-The first update is timed even without this variable. Native capture also logs
+The first update is timed even without this variable. DPS capture also logs
 `setup`, `order/wait`, `focus`, `readback`, `materialize`, `unfocus`, and
 `hide/wait`, plus the captured area. These separate synchronization costs from
 bitmap acquisition. Logged times are wall clock seconds:
@@ -272,7 +278,8 @@ holding a key or button before treating the port as natively verified.
 
 ## Design
 
-`NXVNCFramebuffer` owns the canonical RFB pixel buffer. Its native subclass
+`NXVNCFramebuffer` owns the canonical RFB pixel buffer. `NXVNCInterceptorFramebuffer`
+reads mapped screen memory and falls back to `NXVNCScreenFramebuffer`, which
 uses NeXT's Grabber technique: it briefly orders a borderless nonretained window
 over the screen with Display PostScript automatic filling disabled, reads its
 focused content with `NSBitmapImageRep`, and removes it before converting the
