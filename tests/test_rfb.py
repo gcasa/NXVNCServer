@@ -400,6 +400,7 @@ with tempfile.TemporaryDirectory(prefix='nxvnc-tests-') as temp:
     subprocess.run(['clang','-O2','-Wall','-Wextra','-Werror','-Wno-missing-method-return-type',
                     '-Wno-unused-parameter','-I'+str(folder),'-I'+str(ROOT),'-framework','Foundation',
                     str(ROOT/'tests/test_capture.m'),str(ROOT/'NXVNCFramebuffer.m'),
+                    str(ROOT/'NXVNCInterceptorFramebuffer.m'),
                     str(ROOT/'NXVNCEncoding.c'),'-o',str(folder/'capture')],check=True)
     subprocess.run([str(folder/'capture')],check=True)
     cache_tests(lib)
